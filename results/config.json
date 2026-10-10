@@ -1,0 +1,51 @@
+{
+  "env_id": "hill_racing_env/HillRacing-v0",
+  "observation_dim": 7,
+  "n_actions": 3,
+  "network": {
+    "type": "MLP",
+    "hidden_layers": [
+      128,
+      128
+    ],
+    "activation": "ReLU",
+    "output_activation": "identity"
+  },
+  "training": {
+    "seed": 42,
+    "episodes": 500,
+    "gamma": 0.99,
+    "optimizer": "Adam",
+    "learning_rate": 0.001,
+    "loss": "smooth_l1",
+    "batch_size": 64,
+    "replay_capacity": 100000,
+    "learning_starts": 5000,
+    "train_frequency": 1,
+    "epsilon_start": 1.0,
+    "epsilon_end": 0.05,
+    "epsilon_decay_steps": 100000,
+    "target_update_frequency": 1000,
+    "max_grad_norm": 10.0
+  },
+  "env_kwargs": {
+    "action_space": "discrete_3",
+    "reward_function": "distance",
+    "reward_type": "aggressive",
+    "max_steps": 1200
+  },
+  "command": "src\\train.py --config configs\\dqn_main.yaml --output results",
+  "versions": {
+    "python": "3.12.3",
+    "torch": "2.14.1+cpu",
+    "gymnasium": "1.4.0",
+    "numpy": "2.5.4",
+    "hill_racing_env": "0.1.0"
+  },
+  "best_checkpoint": {
+    "criterion": "media movil de recompensa sobre 20 episodios",
+    "episode": 453,
+    "moving_average_reward": 778.0910225152969,
+    "file": "checkpoint_best.pt"
+  }
+}
