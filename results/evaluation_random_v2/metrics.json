@@ -1,0 +1,20 @@
+{
+  "policy": "random",
+  "checkpoint": null,
+  "episodes": 20,
+  "seed_start": 1000,
+  "seed_end": 1019,
+  "success_threshold": 1000,
+  "reward_mean": -657.9900406956673,
+  "reward_median": -272.07797718048096,
+  "reward_std": 917.0808832946146,
+  "score_mean": 10.45,
+  "score_max": 40,
+  "steps_mean": 449.7,
+  "success_rate": 0.0,
+  "death_rate": 0.95,
+  "truncation_rate": 0.05,
+  "idle_fraction": 0.336446519902157,
+  "gas_fraction": 0.33088725817211473,
+  "reverse_fraction": 0.33266622192572826
+}

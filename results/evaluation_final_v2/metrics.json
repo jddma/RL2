@@ -1,0 +1,20 @@
+{
+  "policy": "dqn",
+  "checkpoint": "results/checkpoint_final.pt",
+  "episodes": 20,
+  "seed_start": 1000,
+  "seed_end": 1019,
+  "success_threshold": 1000,
+  "reward_mean": -97.06439408461254,
+  "reward_median": -97.02522031466167,
+  "reward_std": 0.08459510840245249,
+  "score_mean": 0.0,
+  "score_max": 0,
+  "steps_mean": 53.0,
+  "success_rate": 0.0,
+  "death_rate": 1.0,
+  "truncation_rate": 0.0,
+  "idle_fraction": 0.11320754716981132,
+  "gas_fraction": 0.0,
+  "reverse_fraction": 0.8867924528301887
+}
