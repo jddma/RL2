@@ -1,46 +1,123 @@
-# Taller 2 — Agente Deep Q-Network en Hill Climb Racing
+# Taller 2 — Deep Q-Network (DQN) en Hill Climb Racing
 
-## Objetivo y entorno
+Proyecto académico de aprendizaje por refuerzo que entrena y evalúa un agente **DQN** en `hill_racing_env/HillRacing-v0`. El objetivo es aprender una política de control que permita progresar sobre un terreno con pendientes. **Resultado observado:** ninguno de los agentes evaluados completó el entorno en las 20 semillas de evaluación.
 
-Se implementa un agente DQN para `hill_racing_env/HillRacing-v0` con `action_space="discrete_3"`, `reward_function="distance"`, `reward_type="aggressive"` y `max_steps=1200`. Referencia del entorno: https://github.com/alexzh3/hillclimbracing . Debe verificarse que el entorno no haya sido utilizado previamente en clase.
+## Contenido
 
-## Observaciones, acciones y recompensas
+1. [Entorno y representación](#entorno-y-representación)
+2. [Algoritmo y arquitectura](#algoritmo-y-arquitectura)
+3. [Requisitos e instalación](#requisitos-e-instalación)
+4. [Ejecución reproducible](#ejecución-reproducible)
+5. [Resultados](#resultados)
+6. [Documentación complementaria](#documentación-complementaria)
+7. [Limitaciones y trabajo futuro](#limitaciones-y-trabajo-futuro)
 
-La observación original es un `Dict` con `chassis_position` (`Box`, `(2,)`, `float32`, posición x/y), `chassis_angle` (`Box`, `(1,)`, `float32`, orientación), `wheels_speed` (`Box`, `(2,)`, `float32`, velocidad angular de ambas ruedas) y `on_ground` (`MultiBinary(2)`, habitualmente `int8`, contacto con suelo). El preprocesamiento de `src/env_utils.py` genera un vector `(7,)` `float32`: x/1000, y/700, ángulo/360, ambas velocidades divididas por `13π+0.1` y dos indicadores binarios. Esta representación evita que las diferencias de escala dominen las entradas de la MLP.
+## Entorno y representación
 
-Acciones `Discrete(3)`: `0` sin aceleración, `1` acelerar, `2` reversa. La recompensa por distancia favorece superar la mejor posición horizontal previa; la modalidad agresiva penaliza inmovilidad, retroceso y episodios fallidos. El entorno distingue `terminated` (muerte u objetivo) de `truncated` (límite/atasco). El episodio finaliza con cualquiera; el target DQN solo bloquea bootstrap cuando `terminated=True`. La semántica concreta de las señales debe comprobarse en la versión instalada del entorno.
+- Entorno: `hill_racing_env/HillRacing-v0` del proyecto [hillclimbracing](https://github.com/alexzh3/hillclimbracing).
+- Configuración: acciones `discrete_3`, recompensa `distance`, modalidad `aggressive`, máximo 1200 pasos.
+- Observación original: diccionario con posición (2), ángulo (1), velocidad de ruedas (2) y contacto con el suelo (2).
+- Entrada al agente: vector `float32` de 7 elementos normalizados mediante `src/env_utils.py`.
+- Acciones: 0 = sin acelerar; 1 = acelerar; 2 = reversa.
+- Terminación: `terminated` o `truncated` finalizan el episodio; el bootstrap del target DQN se bloquea solo ante `terminated` según la implementación.
 
-## Particularidades y flujo de entrenamiento
+## Algoritmo y arquitectura
 
-La inercia, las pendientes y los efectos diferidos de acciones justifican explorar trayectorias diversas y usar un descuento alto. El ciclo ejecuta: `reset → estado normalizado → ε-greedy → step → replay (s,a,r,s',terminated) → minibatch → Q_online(s,a) → max Q_target(s',·) → target Bellman → Huber → backpropagation → actualización online → sincronización periódica de target`. La red objetivo se mantiene separada para estabilizar el aprendizaje. El diagrama textual anterior es el pseudoflujo de referencia; su implementación está en `src/dqn.py`.
+Red MLP `7 → 128 (ReLU) → 128 (ReLU) → 3 (lineal)`, con **17.923 parámetros**. Las salidas son valores Q, no probabilidades. El entrenamiento usa selección ε-greedy, replay buffer, red online y target, pérdida Huber y optimizador Adam.
 
-## Red neuronal e hiperparámetros
+`reset → normalizar observación → ε-greedy → step → guardar transición → muestrear minibatch → calcular Q online y target Bellman → Huber → backprop → sincronizar target periódicamente`.
 
-Arquitectura MLP `7 → 128 (ReLU) → 128 (ReLU) → 3 (lineal)`, con 17.923 parámetros. La salida representa tres valores Q, no probabilidades. La configuración oficial se carga desde `configs/dqn_main.yaml`; la tabla por capas y justificación de cada parámetro están en [docs/arquitectura.md](docs/arquitectura.md). Los valores son hipótesis de diseño hasta contrastarlos experimentalmente.
+La configuración oficial está en [`configs/dqn_main.yaml`](configs/dqn_main.yaml) y la justificación técnica en [`docs/README.md`](docs/README.md).
 
-## Instalación y ejecución
+## Requisitos e instalación
 
-Desde la raíz del proyecto:
+Probado por el equipo con Python 3.12.x en Windows. Se recomienda crear un entorno virtual nuevo. El paquete del entorno utiliza dependencias nativas que en Windows pueden requerir **SWIG y herramientas de compilación C++**. Las versiones exactas usadas en las ejecuciones originales están registradas en `results/config.json` y en [`docs/resultados_actividad5.md`](docs/resultados_actividad5.md); `requirements.txt` utiliza rangos y no fija todas las versiones.
 
-```bash
+```powershell
+git clone https://github.com/jddma/RL2.git
+cd RL2
+py -3.12 -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install --upgrade pip
 python -m pip install -r requirements.txt
-python src/inspect_env.py
-python -m pytest -q tests
-python src/train.py --config configs/dqn_main.yaml --output results
-python src/evaluate.py --checkpoint results/checkpoint_final.pt --episodes 20 --seed 1000 --output results
-python src/plot_results.py --logs results/logs.csv --output assets/training_curve.png
 ```
 
-Para una prueba breve (no equivalente al experimento oficial):
+En Linux/macOS, crear el entorno con `python3.12 -m venv .venv` y activarlo con `source .venv/bin/activate`.
 
-```bash
+## Ejecución reproducible
+
+Ejecutar **desde la raíz del repositorio** y con el entorno virtual activado:
+
+**1. Inspección y pruebas:**
+
+```powershell
+python src/inspect_env.py
+python -m pytest -q tests
+```
+
+**2. Prueba corta de integración (no reemplaza el experimento oficial):**
+
+```powershell
 python src/train.py --episodes 3 --learning-starts 10 --batch-size 4 --output results/smoke
 ```
 
-## Reproducibilidad y evidencia
+**3. Entrenamiento oficial (500 episodios):**
 
-El entrenamiento registra seeds, configuración, recompensas por episodio, duración, epsilon, pérdidas, terminación y distancia estimada. Produce `results/logs.csv`, `results/config.json` y `results/checkpoint_final.pt`. La evaluación greedy separada genera `results/evaluation.csv` y `results/metrics.json`; las gráficas se producen desde logs reales. Las dependencias tienen rangos compatibles propuestos: para máxima reproducibilidad deben registrarse y fijarse versiones exactas del entorno y librerías tras una instalación validada.
+```powershell
+python src/train.py --config configs/dqn_main.yaml --output results
+```
 
-## Resultados, reflexión y dificultades
+**Advertencia:** volver a entrenar con `--output results` sobrescribe archivos de entrenamiento existentes. Para preservar los resultados entregados, usa otra carpeta, por ejemplo `--output results/reproduccion`.
 
-No se incluyen métricas ni conclusiones empíricas sin ejecución real. Para completar la rúbrica deben incorporarse la curva de entrenamiento, métricas de evaluación greedy, comparación con baseline cuando sea posible, ejemplos concretos de conducta y análisis crítico de estabilidad, limitaciones y sensibilidad a hiperparámetros. También debe documentarse una dificultad real con su causa, intentos de solución, resultado y aprendizaje. La evaluación de éxito basada en distancia horizontal es una aproximación que debe cotejarse con el indicador oficial de éxito del entorno.
+**4. Evaluación greedy y baseline (20 episodios, semillas 1000–1019):**
+
+```powershell
+python src/evaluate.py --policy dqn --checkpoint results/checkpoint_best.pt --episodes 20 --seed 1000 --output results/evaluation_best_v2
+python src/evaluate.py --policy dqn --checkpoint results/checkpoint_final.pt --episodes 20 --seed 1000 --output results/evaluation_final_v2
+python src/evaluate.py --policy random --episodes 20 --seed 1000 --output results/evaluation_random_v2
+```
+
+**5. Gráficas:**
+
+```powershell
+python src/plot_results.py --logs results/logs.csv --output assets/training_curve.png
+python src/plot_evaluation.py
+```
+
+Las evaluaciones anteriores también sobrescriben los resultados existentes en esas carpetas. Para verificaciones independientes, cambia el argumento `--output`.
+
+## Resultados
+
+Los resultados corresponden a una ejecución de entrenamiento de 500 episodios y a 20 episodios de evaluación por política (semillas 1000–1019), según los artefactos incluidos.
+
+| Métrica | DQN best | DQN final | Aleatorio |
+|---|---:|---:|---:|
+| Recompensa media | -98.026 | -97.064 | -657.990 |
+| Progreso medio (score) | 2.00 | 0.00 | 10.45 |
+| Pasos medios | 50.05 | 53.00 | 449.70 |
+| Éxito | 0 % | 0 % | 0 % |
+| Muerte | 100 % | 100 % | 95 % |
+
+![Curva de entrenamiento](assets/training_curve.png)
+
+![Comparación de evaluación](assets/evaluation_comparison.png)
+
+![Distribución de acciones](assets/evaluation_actions.png)
+
+**Interpretación:** la mejora de recompensa no equivale a resolver el ambiente. Los checkpoints DQN murieron tempranamente en todos los episodios; el baseline aleatorio logró más progreso medio, aunque con recompensa muy variable. El checkpoint final eligió reversa en aproximadamente 88.68 % de los pasos y nunca aceleró durante esta evaluación. Más detalles y advertencias metodológicas en [`docs/resultados_actividad5.md`](docs/resultados_actividad5.md).
+
+## Documentación complementaria
+
+- [`docs/README.md`](docs/README.md): arquitectura e hiperparámetros (documento original del equipo).
+- [`docs/evidencia_ejecucion_actividad5.md`](docs/evidencia_ejecucion_actividad5.md): evidencia de ejecución registrada por el equipo.
+- [`docs/resultados_actividad5.md`](docs/resultados_actividad5.md): análisis experimental detallado.
+- [`docs/challenges.md`](docs/challenges.md): retos y reflexión crítica integrada.
+- [`docs/final_review.md`](docs/final_review.md): auditoría de archivos y checklist de validación.
+
+## Limitaciones y trabajo futuro
+
+Una sola corrida de entrenamiento, 20 episodios de evaluación por política y ausencia de éxito observado no permiten demostrar robustez ni convergencia. Se recomienda evaluar varios entrenamientos con semillas independientes, seleccionar checkpoints por validación greedy, estudiar la función de recompensa, añadir información anticipada del terreno y analizar trayectorias por paso. Las hipótesis requieren experimentación adicional.
+
+## Autoría
+
+Trabajo colaborativo del equipo del repositorio `jddma/RL2`. Añadir aquí nombres, roles y contribuciones **confirmados por los integrantes** antes de la entrega.
